@@ -19,6 +19,8 @@
 #include <inttypes.h>
 #include <stdio.h>
 #include <string>
+#include <chrono>
+#include <thread>
 
 #include <jni.h>
 
@@ -39,7 +41,9 @@ static AMidiDevice* sNativeSendDevice = NULL;
 static AMidiInputPort* sMidiInputPort = NULL;
 
 static pthread_t sReadThread;
+static pthread_t sWriteThread;
 static std::atomic<bool> sReading(false);
+static std::atomic<bool> sWriting(false);
 
 // The Data Callback
 extern JavaVM* theJvm;              // Need this for allocating data buffer for...
@@ -189,6 +193,31 @@ void Java_com_example_nativemidi_AppMidiManager_stopReadingMidi(JNIEnv*, jobject
  * @param   midiDeviceObj   (Java) MidiDevice object.
  * @param   portNumber      The index of the "input" port to open.
  */
+
+static void* writeThreadRoutine(void * context) {
+    (void)context;
+
+    uint8_t* byteArray = new uint8_t[3]{0x90, 0x3C, 0x60};
+    while (sWriting)
+    {
+        // Poll the midi buffer here, copy and flush - record the time
+
+        // GET TIME OUTSIDE THIS LOOP - then increment a set amount each time
+        //auto next = std::chrono::system_clock::now();
+        //auto now = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+        /*ssize_t numSent =*/ AMidiInputPort_send(sMidiInputPort, byteArray, 3);
+        // sleep until recorded time + buffer length
+
+        struct timespec sleepTime;
+        struct timespec returnTime;
+        sleepTime.tv_sec = 1;
+        sleepTime.tv_nsec = 0;
+        nanosleep(&sleepTime, &returnTime);
+    }
+    delete[] byteArray;
+    return NULL;
+}
+
 void Java_com_example_nativemidi_AppMidiManager_startWritingMidi(
         JNIEnv* env, jobject, jobject midiDeviceObj, jint portNumber) {
 
@@ -201,6 +230,12 @@ void Java_com_example_nativemidi_AppMidiManager_startWritingMidi(
     status = AMidiInputPort_open(sNativeSendDevice, portNumber, &inputPort);
     // sMidiInputPort.store(inputPort);
     sMidiInputPort = inputPort;
+
+
+    sWriting = true;
+    pthread_create(&sWriteThread, NULL, writeThreadRoutine, NULL);
+
+
 }
 
 /**
@@ -224,7 +259,14 @@ void Java_com_example_nativemidi_AppMidiManager_stopWritingMidi(JNIEnv*, jobject
 void Java_com_example_nativemidi_AppMidiManager_writeMidi(JNIEnv* env, jobject,
         jbyteArray data, jint numBytes) {
     jbyte* bufferPtr = env->GetByteArrayElements(data, NULL);
-    /*ssize_t numSent =*/ AMidiInputPort_send(sMidiInputPort, (uint8_t*)bufferPtr, numBytes);
+
+    uint8_t* byteArray = new uint8_t[3]{0x90, 0x3C, 0x60};
+    numBytes = 4;
+
+    // /*ssize_t numSent =*/ AMidiInputPort_send(sMidiInputPort, (uint8_t*)bufferPtr, numBytes);
+    /*ssize_t numSent =*/ AMidiInputPort_send(sMidiInputPort, byteArray, 3);
+
+    delete[] byteArray;
     env->ReleaseByteArrayElements(data, bufferPtr, JNI_ABORT);
 }
 

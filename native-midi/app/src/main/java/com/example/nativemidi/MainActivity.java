@@ -15,7 +15,7 @@
  *
  */
 
-package com.example.nativemidi;
+package com.example.nativemidi; // Namespace and program package - see folder name
 
 import android.app.Activity;
 import android.content.Context;
@@ -43,7 +43,7 @@ import java.util.ArrayList;
  * Application MainActivity handles UI and Midi device hotplug event from
  * native side.
  */
-public class MainActivity extends Activity
+public class MainActivity extends Activity // Main entry point for app
     implements View.OnClickListener,
                SeekBar.OnSeekBarChangeListener,
                AdapterView.OnItemSelectedListener {
@@ -52,7 +52,7 @@ public class MainActivity extends Activity
 
     private AppMidiManager mAppMidiManager;
 
-    // Connected devices
+    // Connected devices - List format - will be populated?
     private ArrayList<MidiDeviceInfo> mReceiveDevices = new ArrayList<MidiDeviceInfo>();
     private ArrayList<MidiDeviceInfo> mSendDevices = new ArrayList<MidiDeviceInfo>();
 
@@ -74,9 +74,9 @@ public class MainActivity extends Activity
     }
 
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
+    protected void onCreate(Bundle savedInstanceState) { // Entry point on app opening
+        super.onCreate(savedInstanceState); // Running parent class onCreates
+        setContentView(R.layout.activity_main); // Setting content view to our resource file
 
         //
         // Init JNI for data receive callback
@@ -86,6 +86,8 @@ public class MainActivity extends Activity
         //
         // Setup UI
         //
+
+        // Connecting GUI from R.id -> inside layout activity main
         mOutputDevicesSpinner = (Spinner)findViewById(R.id.outputDevicesSpinner);
         mOutputDevicesSpinner.setOnItemSelectedListener(this);
 
@@ -108,6 +110,9 @@ public class MainActivity extends Activity
         mProgNumberEdit = (EditText)findViewById(R.id.progNumEdit);
 
         mReceiveMessageTx = (TextView)findViewById(R.id.receiveMessageTx);
+
+
+
 
         MidiManager midiManager = (MidiManager) getSystemService(Context.MIDI_SERVICE);
         midiManager.registerDeviceCallback(new MidiDeviceCallback(), new Handler());

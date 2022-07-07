@@ -25,9 +25,10 @@
             android:textSize="30sp"/>
 
         <Spinner
+            android:id="@+id/outputDevicesSpinner"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:id="@+id/outputDevicesSpinner"/>
+            android:minHeight="48dp" />
 
         <TextView
             android:text="Note Messages"
@@ -103,9 +104,10 @@
             android:paddingTop="16dp"/>
 
         <Spinner
+            android:id="@+id/inputDevicesSpinner"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:id="@+id/inputDevicesSpinner"/>
+            android:minHeight="48dp" />
 
         <TextView
             android:text="Messages"
