@@ -67,12 +67,7 @@ static SLVolumeItf bqPlayerVolume;
 static SLmilliHertz bqPlayerSampleRate = 0;
 static jint   bqPlayerBufSize = 0;
 static short *resampleBuf = NULL;
-// a mutext to guard against re-entrance to record & playback
-// as well as make recording and playing back to be mutually exclusive
-// this is to avoid crash at situations like:
-//    recording is in session [not finished]
-//    user presses record button and another recording coming in
-// The action: when recording/playing back is not finished, ignore the new request
+
 static pthread_mutex_t  audioEngineLock = PTHREAD_MUTEX_INITIALIZER;
 
 // aux effect on the output mix, used by the buffer queue player

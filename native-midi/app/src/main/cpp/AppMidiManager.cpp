@@ -33,37 +33,11 @@
 
 #include "MidiSpec.h"
 
-static AMidiDevice* sNativeReceiveDevice = NULL;
-// The thread only reads this value, so no special protection is required.
-static AMidiOutputPort* sMidiOutputPort= NULL;
-
 static AMidiDevice* sNativeSendDevice = NULL;
 static AMidiInputPort* sMidiInputPort = NULL;
 
-static pthread_t sReadThread;
 static pthread_t sWriteThread;
-static std::atomic<bool> sReading(false);
 static std::atomic<bool> sWriting(false);
-
-// The Data Callback
-extern JavaVM* theJvm;              // Need this for allocating data buffer for...
-extern jobject dataCallbackObj;     // This is the (Java) object that implements...
-extern jmethodID midDataCallback;   // ...this callback routine
-
-static void SendTheReceivedData(uint8_t* data, int numBytes) {
-    JNIEnv* env;
-    theJvm->AttachCurrentThread(&env, NULL);
-    if (env == NULL) {
-        LOGE("Error retrieving JNI Env");
-    }
-
-    // Allocate the Java array and fill with received data
-    jbyteArray ret = env->NewByteArray(numBytes);
-    env->SetByteArrayRegion (ret, 0, numBytes, (jbyte*)data);
-
-    // send it to the (Java) callback
-    env->CallVoidMethod(dataCallbackObj, midDataCallback, ret);
-}
 
 #if 0
 // unblock this method if logging of the midi messages is required.
@@ -87,125 +61,26 @@ static void logMidiBuffer(int64_t timestamp, uint8_t* dataBytes, size_t numDataB
 }
 #endif
 
-/*
- * Receiving API
- */
- /**
-  * This routine polls the input port and dispatches received data to the application-provided
-  * (Java) callback.
-  */
-static void* readThreadRoutine(void * context) {
-    (void)context;  // unused
-
-    sReading = true;
-    // AMidiOutputPort* outputPort = sMidiOutputPort.load();
-    AMidiOutputPort* outputPort = sMidiOutputPort;
-
-    const size_t MAX_BYTES_TO_RECEIVE = 128;
-    uint8_t incomingMessage[MAX_BYTES_TO_RECEIVE];
-
-    while (sReading) {
-        // AMidiOutputPort_receive is non-blocking, so let's not burn up the CPU unnecessarily
-        usleep(2000);
-
-        int32_t opcode;
-        size_t numBytesReceived;
-        int64_t timestamp;
-        ssize_t numMessagesReceived =
-                AMidiOutputPort_receive(outputPort,
-                    &opcode, incomingMessage, MAX_BYTES_TO_RECEIVE,
-                    &numBytesReceived, &timestamp);
-
-        if (numMessagesReceived < 0) {
-            LOGW("Failure receiving MIDI data %zd", numMessagesReceived);
-            // Exit the thread
-            sReading = false;
-        }
-        if (numMessagesReceived > 0 && numBytesReceived >= 0) {
-            if (opcode == AMIDI_OPCODE_DATA &&
-                (incomingMessage[0] & kMIDISysCmdChan) != kMIDISysCmdChan) {
-                // (optionally) Dump to log
-                // logMidiBuffer(timestamp, incomingMessage, numBytesReceived);
-                SendTheReceivedData(incomingMessage, numBytesReceived);
-            } else if (opcode == AMIDI_OPCODE_FLUSH) {
-                // ignore
-            }
-        }
-    }   // end while(sReading)
-
-    return NULL;
-}
-
 //
 // JNI Functions
 //
 extern "C" {
 
-/**
- * Native implementation of TBMidiManager.startReadingMidi() method.
- * Opens the first "output" port from specified MIDI device for sReading.
- * @param   env  JNI Env pointer.
- * @param   (unnamed)   TBMidiManager (Java) object.
- * @param   midiDeviceObj   (Java) MidiDevice object.
- * @param   portNumber      The index of the "output" port to open.
- */
-void Java_com_example_nativemidi_AppMidiManager_startReadingMidi(
-        JNIEnv* env, jobject, jobject midiDeviceObj, jint portNumber) {
-
-    media_status_t status;
-    status = AMidiDevice_fromJava(env, midiDeviceObj, &sNativeReceiveDevice);
-    // int32_t deviceType = AMidiDevice_getType(sNativeReceiveDevice);
-    // ssize_t numPorts = AMidiDevice_getNumOutputPorts(sNativeReceiveDevice);
-
-    AMidiOutputPort *outputPort;
-    status = AMidiOutputPort_open(sNativeReceiveDevice, portNumber, &outputPort);
-
-    // sMidiOutputPort.store(outputPort);
-    sMidiOutputPort = outputPort;
-
-    // Start read thread
-    // pthread_init(true);
-    /*int pthread_result =*/ pthread_create(&sReadThread, NULL, readThreadRoutine, NULL);
-}
-
-/**
- * Native implementation of the (Java) TBMidiManager.stopReadingMidi() method.
- * @param   (unnamed)   JNI Env pointer.
- * @param   (unnamed)   TBMidiManager (Java) object.
- */
-void Java_com_example_nativemidi_AppMidiManager_stopReadingMidi(JNIEnv*, jobject) {
-    // need some synchronization here
-    sReading = false;
-    pthread_join(sReadThread, NULL);
-
-    /*media_status_t status =*/ AMidiDevice_release(sNativeReceiveDevice);
-    sNativeReceiveDevice = NULL;
-}
-
-/*
- * Sending API
- */
-/**
- * Native implementation of TBMidiManager.startWritingMidi() method.
- * Opens the first "input" port from specified MIDI device for writing.
- * @param   env  JNI Env pointer.
- * @param   (unnamed)   TBMidiManager (Java) object.
- * @param   midiDeviceObj   (Java) MidiDevice object.
- * @param   portNumber      The index of the "input" port to open.
- */
-
 static void* writeThreadRoutine(void * context) {
     (void)context;
 
     uint8_t* byteArray = new uint8_t[3]{0x90, 0x3C, 0x60};
+    bool test = false;
     while (sWriting)
     {
         // Poll the midi buffer here, copy and flush - record the time
 
         // GET TIME OUTSIDE THIS LOOP - then increment a set amount each time
         //auto next = std::chrono::system_clock::now();
-        //auto now = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-        /*ssize_t numSent =*/ AMidiInputPort_send(sMidiInputPort, byteArray, 3);
+        auto now = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+        test = !test;
+        if(test) now = now + 100;
+        /*ssize_t numSent =*/ AMidiInputPort_sendWithTimestamp(sMidiInputPort, byteArray, 3,now);
         // sleep until recorded time + buffer length
 
         struct timespec sleepTime;
@@ -238,36 +113,10 @@ void Java_com_example_nativemidi_AppMidiManager_startWritingMidi(
 
 }
 
-/**
- * Native implementation of the (Java) TBMidiManager.stopWritingMidi
- * @param   (unnamed)   JNI Env pointer.
- * @param   (unnamed)   TBMidiManager (Java) object.
- */
 void Java_com_example_nativemidi_AppMidiManager_stopWritingMidi(JNIEnv*, jobject) {
     /*media_status_t status =*/ AMidiDevice_release(sNativeSendDevice);
     sNativeSendDevice = NULL;
 }
 
-/**
- * Native implementation of the (Java) TBMidiManager.writeMidi() method.
- * Writes a byte buffer to the (already open) "input" port.
- * @param   env  JNI Env pointer.
- * @param   (unnamed)   TBMidiManager (Java) object.
- * @param   data    The data buffer.
- * @param   numBytes    The number of bytes to send.
- */
-void Java_com_example_nativemidi_AppMidiManager_writeMidi(JNIEnv* env, jobject,
-        jbyteArray data, jint numBytes) {
-    jbyte* bufferPtr = env->GetByteArrayElements(data, NULL);
-
-    uint8_t* byteArray = new uint8_t[3]{0x90, 0x3C, 0x60};
-    numBytes = 4;
-
-    // /*ssize_t numSent =*/ AMidiInputPort_send(sMidiInputPort, (uint8_t*)bufferPtr, numBytes);
-    /*ssize_t numSent =*/ AMidiInputPort_send(sMidiInputPort, byteArray, 3);
-
-    delete[] byteArray;
-    env->ReleaseByteArrayElements(data, bufferPtr, JNI_ABORT);
-}
 
 } // extern "C"

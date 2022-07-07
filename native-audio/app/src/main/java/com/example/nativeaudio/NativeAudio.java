@@ -38,17 +38,7 @@ import android.widget.Spinner;
 import android.widget.Toast;
 
 public class NativeAudio extends Activity
-        implements ActivityCompat.OnRequestPermissionsResultCallback {
-
-
-    //static final String TAG = "NativeAudio";
-    private static final int AUDIO_ECHO_REQUEST = 0;
-
-    static final int CLIP_NONE = 0;
-    static final int CLIP_HELLO = 1;
-    static final int CLIP_ANDROID = 2;
-    static final int CLIP_SAWTOOTH = 3;
-    static final int CLIP_PLAYBACK = 4;
+{
 
     static String URI;
     static AssetManager assetManager;
@@ -72,12 +62,7 @@ public class NativeAudio extends Activity
 
         int sampleRate = 0;
         int bufSize = 0;
-        /*
-         * retrieve fast audio path sample rate and buf size; if we have it, we pass to native
-         * side to create a player with fast audio enabled [ fast audio == low latency audio ];
-         * IF we do not have a fast audio path, we pass 0 for sampleRate, which will force native
-         * side to pick up the 8Khz sample rate.
-         */
+
         if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
             AudioManager myAudioMgr = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
             String nativeParam = myAudioMgr.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE);

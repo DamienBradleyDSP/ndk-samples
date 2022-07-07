@@ -26,15 +26,8 @@ import java.util.ArrayList;
 
 public class AppMidiManager {
     private static final String TAG = AppMidiManager.class.getName();
-
     private MidiManager mMidiManager;
-
-    // Selected Device(s)
-    private MidiDevice mReceiveDevice; // an "Output" device is one we will RECEIVE data FROM
-
     private MidiDevice mSendDevice; // an "Input" device is one we will SEND data TO
-    private MidiInputPort mSendPort;
-
     private boolean mUseRunningStatus = true;
 
     public AppMidiManager(MidiManager midiManager) {
@@ -45,15 +38,8 @@ public class AppMidiManager {
         return mMidiManager;
     }
 
-    /**
-     * Scan attached Midi devices forcefully from scratch
-     * @param sendDevices, container for send devices
-     * @param receiveDevices, container for receive devices
-     */
-    public void ScanMidiDevices(ArrayList<MidiDeviceInfo> sendDevices,
-                                 ArrayList<MidiDeviceInfo> receiveDevices) {
+    public void ScanMidiDevices(ArrayList<MidiDeviceInfo> sendDevices) {
         sendDevices.clear();
-        receiveDevices.clear();
         MidiDeviceInfo[] devInfos = mMidiManager.getDevices();
         for(MidiDeviceInfo devInfo : devInfos) {
             int numInPorts = devInfo.getInputPortCount();
@@ -65,39 +51,9 @@ public class AppMidiManager {
             if (numInPorts > 0) {
                 sendDevices.add(devInfo);
             }
-
-            int numOutPorts = devInfo.getOutputPortCount();
-            if (numOutPorts > 0) {
-                receiveDevices.add(devInfo);
-            }
         }
     }
 
-    //
-    // Receive Device
-    //
-    public class OpenMidiReceiveDeviceListener implements MidiManager.OnDeviceOpenedListener {
-        @Override
-        public void onDeviceOpened(MidiDevice device) {
-            mReceiveDevice = device;
-            startReadingMidi(mReceiveDevice, 0/*mPortNumber*/);
-        }
-    }
-
-    public void openReceiveDevice(MidiDeviceInfo devInfo) {
-        mMidiManager.openDevice(devInfo, new OpenMidiReceiveDeviceListener(), null);
-    }
-
-    public void closeReceiveDevice() {
-        if (mReceiveDevice != null) {
-            // Native API
-            mReceiveDevice = null;
-        }
-    }
-
-    //
-    // Send Device
-    //
     public class OpenMidiSendDeviceListener implements MidiManager.OnDeviceOpenedListener {
         @Override
         public void onDeviceOpened(MidiDevice device) {
@@ -117,59 +73,11 @@ public class AppMidiManager {
         }
     }
 
-    private void sendMessages(byte[] msgBuff) {
-        writeMidi(msgBuff, msgBuff.length);
-    }
-
-    //
-    // Message Sending methods
-    //
-    public void sendNoteOn(byte chan, byte[] keys, byte[] velocities) {
-        byte[] keyMsgBuff = MidiDataHelper.make3ByteMsgBuff(
-                MidiSpec.MIDICODE_NOTEON, chan, keys, velocities, mUseRunningStatus);
-        sendMessages(keyMsgBuff);
-    }
-
-    public void sendNoteOff(byte chan, byte[] keys, byte[] velocities) {
-        byte[] keyMsgBuff = MidiDataHelper.make3ByteMsgBuff(
-                MidiSpec.MIDICODE_NOTEOFF, chan, keys, velocities, mUseRunningStatus);
-        sendMessages(keyMsgBuff);
-    }
-
-    public void sendController(byte chan, byte controller, byte value) {
-        byte[] controllers = {controller};
-        byte[] values = {value};
-        byte[] msgBuff = MidiDataHelper.make3ByteMsgBuff(
-                MidiSpec.MIDICODE_CONTROLLER, chan, controllers, values, mUseRunningStatus);
-        sendMessages(msgBuff);
-    }
-
-    public void sendPitchBend(byte chan, int value) {
-        byte[] lsbs = {(byte)(value & 0xEF)};
-        byte[] msbs = {(byte)((value >> 7) & 0xEF)};
-        byte[] msgBuff = MidiDataHelper.make3ByteMsgBuff(
-                MidiSpec.MIDICODE_PITCHBEND, chan, lsbs, msbs, mUseRunningStatus);
-        sendMessages(msgBuff);
-    }
-
-    public void sendProgramChange(byte chan, byte value) {
-        byte[] values = {value};
-        byte[] msgBuff = MidiDataHelper.make2ByteMsgBuff(
-                MidiSpec.MIDICODE_PROGCHANGE, chan, values, mUseRunningStatus);
-        sendMessages(msgBuff);
-    }
-
-    //
-    // Native API stuff
-    //
     public static void loadNativeAPI() {
         System.loadLibrary("native_midi");
     }
 
-    public native void startReadingMidi(MidiDevice receiveDevice, int portNumber);
-    public native void stopReadingMidi();
-
     public native void startWritingMidi(MidiDevice sendDevice, int portNumber);
     public native void stopWritingMidi();
-    public native void writeMidi(byte[] data, int length);
+    
 }
