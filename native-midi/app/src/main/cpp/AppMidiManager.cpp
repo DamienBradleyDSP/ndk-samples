@@ -72,7 +72,7 @@ static SLAndroidSimpleBufferQueueItf bqPlayerBufferQueue;
 static SLmilliHertz bqPlayerSampleRate = 0;
 static jint   bqPlayerBufSize = 0;
 
-static pthread_mutex_t  audioEngineLock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t  engineMutexLock = PTHREAD_MUTEX_INITIALIZER;
 
 static short *nextBuffer;
 
@@ -90,6 +90,8 @@ void midiEngineCallback(SLAndroidSimpleBufferQueueItf bq, void *context)
     AMidiInputPort_send(sMidiInputPort, byteArray, 3);
 
     delete[] byteArray;
+
+    // what happens in the case of a midi device change or diconnection?
 
     (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, nextBuffer, bqPlayerBufSize);
 }
@@ -264,7 +266,7 @@ Java_com_example_nativemidi_AppMidiManager_shutdown(JNIEnv*, jclass) {
 
     delete nextBuffer;
 
-    pthread_mutex_destroy(&audioEngineLock);
+    pthread_mutex_destroy(&engineMutexLock);
 }
 
 } // extern "C"
