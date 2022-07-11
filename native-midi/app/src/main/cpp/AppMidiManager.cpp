@@ -74,69 +74,25 @@ static jint   bqPlayerBufSize = 0;
 
 static pthread_mutex_t  audioEngineLock = PTHREAD_MUTEX_INITIALIZER;
 
+static short *nextBuffer;
+
 //
 // JNI Functions
 //
 extern "C" {
 
-void bqPlayerCallback(SLAndroidSimpleBufferQueueItf bq, void *context)
+void midiEngineCallback(SLAndroidSimpleBufferQueueItf bq, void *context)
 {
     assert(bq == bqPlayerBufferQueue);
     assert(NULL == context);
 
-    (void)context;
-
     uint8_t* byteArray = new uint8_t[3]{0x90, 0x3C, 0x60};
-    bool test = false;
-    while (sWriting)
-    {
-        // Poll the midi buffer here, copy and flush - record the time
+    AMidiInputPort_send(sMidiInputPort, byteArray, 3);
 
-        // GET TIME OUTSIDE THIS LOOP - then increment a set amount each time
-        //auto next = std::chrono::system_clock::now();
-        auto now = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-        test = !test;
-        if(test) now = now + 100;
-        /*ssize_t numSent =*/ AMidiInputPort_sendWithTimestamp(sMidiInputPort, byteArray, 3,now);
-        // sleep until recorded time + buffer length
-
-        struct timespec sleepTime;
-        struct timespec returnTime;
-        sleepTime.tv_sec = 1;
-        sleepTime.tv_nsec = 0;
-        nanosleep(&sleepTime, &returnTime);
-    }
     delete[] byteArray;
+
+    (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, nextBuffer, bqPlayerBufSize);
 }
-
-/*
-static void* writeThreadRoutine(void * context) {
-    (void)context;
-
-    uint8_t* byteArray = new uint8_t[3]{0x90, 0x3C, 0x60};
-    bool test = false;
-    while (sWriting)
-    {
-        // Poll the midi buffer here, copy and flush - record the time
-
-        // GET TIME OUTSIDE THIS LOOP - then increment a set amount each time
-        //auto next = std::chrono::system_clock::now();
-        auto now = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-        test = !test;
-        if(test) now = now + 100;
-        AMidiInputPort_sendWithTimestamp(sMidiInputPort, byteArray, 3,now);
-        // sleep until recorded time + buffer length
-
-        struct timespec sleepTime;
-        struct timespec returnTime;
-        sleepTime.tv_sec = 1;
-        sleepTime.tv_nsec = 0;
-        nanosleep(&sleepTime, &returnTime);
-    }
-    delete[] byteArray;
-    return NULL;
-}
- */
 
 void Java_com_example_nativemidi_AppMidiManager_startWritingMidi(
         JNIEnv* env, jobject, jobject midiDeviceObj, jint portNumber) {
@@ -266,9 +222,16 @@ JNIEXPORT void JNICALL Java_com_example_nativemidi_AppMidiManager_createBufferQu
     (void)result;
 
     // register callback on the buffer queue
-    result = (*bqPlayerBufferQueue)->RegisterCallback(bqPlayerBufferQueue, bqPlayerCallback, NULL);
+    result = (*bqPlayerBufferQueue)->RegisterCallback(bqPlayerBufferQueue, midiEngineCallback, NULL);
     assert(SL_RESULT_SUCCESS == result);
     (void)result;
+
+    short* buffer = new short[bqPlayerBufSize];
+    for(int i = 0; i<bqPlayerBufSize; i++) buffer[i] = 0;
+
+    nextBuffer = buffer;
+    (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, nextBuffer, bqPlayerBufSize);
+    (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, nextBuffer, bqPlayerBufSize);
 
     // set the player's state to playing
     result = (*bqPlayerPlay)->SetPlayState(bqPlayerPlay, SL_PLAYSTATE_PLAYING);
@@ -298,6 +261,8 @@ Java_com_example_nativemidi_AppMidiManager_shutdown(JNIEnv*, jclass) {
     engineObject = NULL;
     engineEngine = NULL;
     }
+
+    delete nextBuffer;
 
     pthread_mutex_destroy(&audioEngineLock);
 }
