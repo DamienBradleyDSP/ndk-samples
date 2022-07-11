@@ -39,23 +39,12 @@ import android.widget.Toast;
 
 public class NativeAudio extends Activity
 {
-
-    static String URI;
-    static AssetManager assetManager;
-
-    static boolean isPlayingAsset = false;
-    static boolean isPlayingUri = false;
-
-    static int numChannelsUri = 0;
-
     /** Called when the activity is first created. */
     @Override
     @TargetApi(17)
     protected void onCreate(Bundle icicle) {
         super.onCreate(icicle);
         setContentView(R.layout.main);
-
-        assetManager = getAssets();
 
         // initialize native audio system
         createEngine();

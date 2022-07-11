@@ -21,6 +21,11 @@ import android.media.midi.MidiDevice;
 import android.media.midi.MidiDeviceInfo;
 import android.media.midi.MidiManager;
 import android.media.midi.MidiInputPort;
+import android.content.Context;
+import android.content.res.AssetManager;
+import android.media.AudioManager;
+import android.os.Build;
+import android.os.Bundle;
 
 import java.util.ArrayList;
 
@@ -72,12 +77,32 @@ public class AppMidiManager {
             mSendDevice = null;
         }
     }
+    // OPENSL ES SETUP
+    void createOpenSLEngine(Context context)
+    {
+        createEngine();
+
+        int sampleRate = 0;
+        int bufSize = 0;
+
+        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
+            AudioManager myAudioMgr = (AudioManager) context.getSystemService(context.AUDIO_SERVICE);
+            String nativeParam = myAudioMgr.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE);
+            sampleRate = Integer.parseInt(nativeParam);
+            nativeParam = myAudioMgr.getProperty(AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER);
+            bufSize = Integer.parseInt(nativeParam);
+        }
+        createBufferQueueAudioPlayer(sampleRate, bufSize);
+    }
 
     public static void loadNativeAPI() {
         System.loadLibrary("native_midi");
     }
-
     public native void startWritingMidi(MidiDevice sendDevice, int portNumber);
     public native void stopWritingMidi();
+
+    public static native void createEngine();
+    public static native void createBufferQueueAudioPlayer(int sampleRate, int samplesPerBuf);
+    public static native void shutdown();
     
 }

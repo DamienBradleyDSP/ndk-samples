@@ -71,6 +71,8 @@ public class MainActivity extends Activity // Main entry point for app
 
         ScanMidiDevices();
 
+        mAppMidiManager.createOpenSLEngine(this);
+
     }
 
     private class MidiDeviceCallback extends MidiManager.DeviceCallback {
