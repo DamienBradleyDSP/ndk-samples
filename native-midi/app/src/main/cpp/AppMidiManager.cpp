@@ -34,6 +34,7 @@
 #include <amidi/AMidi.h>
 
 #include "MidiSpec.h"
+#include "MidiEngine.h"
 #include <jni.h>
 
 // for native audio
@@ -48,10 +49,6 @@
 
 static AMidiDevice* sNativeSendDevice = NULL;
 static AMidiInputPort* sMidiInputPort = NULL;
-
-//static pthread_t sWriteThread;
-static std::atomic<bool> sWriting(false);
-
 
 //                  SL ES SETUP
 // engine interfaces
@@ -76,6 +73,12 @@ static pthread_mutex_t  engineMutexLock = PTHREAD_MUTEX_INITIALIZER;
 
 static short *nextBuffer;
 
+static MidiEngine midiEngine;
+static uint8_t* byteArray;
+static double maximumMidiBitsPerBuffer;
+static int maximumMidiBytesPerBuffer;
+const int midiBaudRate = 31250;
+
 //
 // JNI Functions
 //
@@ -86,10 +89,10 @@ void midiEngineCallback(SLAndroidSimpleBufferQueueItf bq, void *context)
     assert(bq == bqPlayerBufferQueue);
     assert(NULL == context);
 
-    uint8_t* byteArray = new uint8_t[3]{0x90, 0x3C, 0x60};
-    AMidiInputPort_send(sMidiInputPort, byteArray, 3);
+    //uint8_t* byteArray = new uint8_t[3]{0x90, 0x3C, 0x60};
 
-    delete[] byteArray;
+    midiEngine.generateMidi(byteArray, 12);
+    AMidiInputPort_send(sMidiInputPort, byteArray, 12);
 
     // what happens in the case of a midi device change or diconnection?
 
@@ -108,12 +111,6 @@ void Java_com_example_nativemidi_AppMidiManager_startWritingMidi(
     status = AMidiInputPort_open(sNativeSendDevice, portNumber, &inputPort);
     // sMidiInputPort.store(inputPort);
     sMidiInputPort = inputPort;
-
-
-    sWriting = true;
-    //pthread_create(&sWriteThread, NULL, writeThreadRoutine, NULL);
-
-
 }
 
 void Java_com_example_nativemidi_AppMidiManager_stopWritingMidi(JNIEnv*, jobject) {
@@ -235,6 +232,12 @@ JNIEXPORT void JNICALL Java_com_example_nativemidi_AppMidiManager_createBufferQu
     (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, nextBuffer, bqPlayerBufSize);
     (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, nextBuffer, bqPlayerBufSize);
 
+    midiEngine.initialise(sampleRate,bqPlayerBufSize);
+    maximumMidiBitsPerBuffer = (double)midiBaudRate/((double)sampleRate/(double)bqPlayerBufSize);
+    maximumMidiBytesPerBuffer = (int)(maximumMidiBitsPerBuffer/8.0);
+
+    byteArray = new uint8_t[maximumMidiBytesPerBuffer];
+
     // set the player's state to playing
     result = (*bqPlayerPlay)->SetPlayState(bqPlayerPlay, SL_PLAYSTATE_PLAYING);
     assert(SL_RESULT_SUCCESS == result);
@@ -265,6 +268,9 @@ Java_com_example_nativemidi_AppMidiManager_shutdown(JNIEnv*, jclass) {
     }
 
     delete nextBuffer;
+    delete byteArray;
+
+    midiEngine.shutDown();
 
     pthread_mutex_destroy(&engineMutexLock);
 }

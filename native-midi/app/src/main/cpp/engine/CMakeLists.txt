@@ -1,0 +1,1 @@
+add_library(polykolEngine ProjectSettings.h MidiMessage.cpp MidiMessage.h MidiController.cpp MidiController.h Beat.cpp Beat.h RhythmModule.cpp RhythmModule.h Sequencer.cpp Sequencer.h)
