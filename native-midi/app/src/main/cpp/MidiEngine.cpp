@@ -14,11 +14,11 @@ void MidiEngine::initialise(double s, int b) {
     sequencer->initialise(sampleRate, bufferLength);
 }
 
-void MidiEngine::generateMidi(std::uint8_t* midiByteArray, int numberOfBytes) {
+bool MidiEngine::generateMidi(uint8_t* midiByteArray, int numberOfBytes) {
 
     clearMidiArray(midiByteArray, numberOfBytes);
 
-    currentPosition.bpm = 30;
+    currentPosition.bpm = ((double)bufferLength*20.0)/60.0;
     currentPosition.ppqPosition = 0;                    // INSERT TESTING SCRIPT
     currentPosition.ppqPositionOfLastBarStart = 0;
 
@@ -44,13 +44,13 @@ void MidiEngine::generateMidi(std::uint8_t* midiByteArray, int numberOfBytes) {
     std::list<dbMidiMessage> midiMessages;
     sequencer->generateMidi(midiMessages, currentPosition);
 
-    auto arrayLocation = 0;
-    for (auto message : midiMessages)
-    {
-        message.setByteMessage(midiByteArray+arrayLocation, 3);
-        arrayLocation+=3;
+    bool messageSent = false;
+    for (auto message : midiMessages) {
+        message.setByteMessage(midiByteArray, 3);
+        messageSent = true;
     }
 
+    return messageSent;
 }
 
 void MidiEngine::shutDown() {

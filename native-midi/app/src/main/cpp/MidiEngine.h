@@ -13,7 +13,7 @@ class MidiEngine {
 public:
     void initialise(double sampleRate, int bufferLength);
 
-    void generateMidi(std::uint8_t* , int);
+    bool generateMidi(uint8_t* , int);
     void shutDown();
 
 private:

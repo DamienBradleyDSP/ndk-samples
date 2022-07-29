@@ -89,10 +89,8 @@ void midiEngineCallback(SLAndroidSimpleBufferQueueItf bq, void *context)
     assert(bq == bqPlayerBufferQueue);
     assert(NULL == context);
 
-    //uint8_t* byteArray = new uint8_t[3]{0x90, 0x3C, 0x60};
-
-    midiEngine.generateMidi(byteArray, 12);
-    AMidiInputPort_send(sMidiInputPort, byteArray, 12);
+    bool messagesReceived = midiEngine.generateMidi(byteArray, 3);
+    if(messagesReceived) AMidiInputPort_send(sMidiInputPort, byteArray, 3);
 
     // what happens in the case of a midi device change or diconnection?
 
@@ -236,7 +234,9 @@ JNIEXPORT void JNICALL Java_com_example_nativemidi_AppMidiManager_createBufferQu
     maximumMidiBitsPerBuffer = (double)midiBaudRate/((double)sampleRate/(double)bqPlayerBufSize);
     maximumMidiBytesPerBuffer = (int)(maximumMidiBitsPerBuffer/8.0);
 
-    byteArray = new uint8_t[maximumMidiBytesPerBuffer];
+    byteArray = new uint8_t[3];
+
+
 
     // set the player's state to playing
     result = (*bqPlayerPlay)->SetPlayState(bqPlayerPlay, SL_PLAYSTATE_PLAYING);
