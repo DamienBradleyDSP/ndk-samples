@@ -68,6 +68,7 @@ static SLAndroidSimpleBufferQueueItf bqPlayerBufferQueue;
 
 static SLmilliHertz bqPlayerSampleRate = 0;
 static jint   bqPlayerBufSize = 0;
+static jint bqSampleRate = 0;
 
 static pthread_mutex_t  engineMutexLock = PTHREAD_MUTEX_INITIALIZER;
 
@@ -78,6 +79,26 @@ static uint8_t* byteArray;
 static double maximumMidiBitsPerBuffer;
 static int maximumMidiBytesPerBuffer;
 const int midiBaudRate = 31250;
+static jlong timeOfMidiStart = 0;
+static jlong nanoSecondsPerBuffer;
+static int maxAmidiBufferSize = 1015;// AMIDI_BUFFER_SIZE - (AMIDI_PACKET_SIZE - AMIDI_PACKET_OVERHEAD)
+
+static jlong System_nanoTime() {
+    timespec now;
+#ifdef CLOCK_MONOTONIC_RAW
+    clock_gettime(CLOCK_MONOTONIC_RAW, &now);
+#else // Darwin, say.
+    clock_gettime(CLOCK_MONOTONIC, &now);
+#endif
+    return now.tv_sec * 1000000000LL + now.tv_nsec;
+}
+
+static jlong calculateNanoSecondsPerBuffer()
+{
+    double secondsPerBuffer =  (double)bqPlayerBufSize/(double)bqSampleRate;
+    double nanoPerBuffer = secondsPerBuffer*1000000000LL;
+    return nanoPerBuffer;
+}
 
 //
 // JNI Functions
@@ -89,10 +110,13 @@ void midiEngineCallback(SLAndroidSimpleBufferQueueItf bq, void *context)
     assert(bq == bqPlayerBufferQueue);
     assert(NULL == context);
 
-    bool messagesReceived = midiEngine.generateMidi(byteArray, 3);
-    if(messagesReceived) AMidiInputPort_send(sMidiInputPort, byteArray, 3);
+    if(timeOfMidiStart==0) timeOfMidiStart = System_nanoTime()+nanoSecondsPerBuffer;
+    else timeOfMidiStart += nanoSecondsPerBuffer; // Will this go out of sync?????
+    //timeOfMidiStart = System_nanoTime()+nanoSecondsPerBuffer; // potentially just this
 
-    // what happens in the case of a midi device change or diconnection?
+    auto numberOfBytesSent = midiEngine.generateMidi(byteArray, maxAmidiBufferSize);
+
+    AMidiInputPort_sendWithTimestamp(sMidiInputPort, byteArray, numberOfBytesSent, timeOfMidiStart); // send without timestamp just calls send with timestamp
 
     (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, nextBuffer, bqPlayerBufSize);
 }
@@ -167,6 +191,7 @@ JNIEXPORT void JNICALL Java_com_example_nativemidi_AppMidiManager_createBufferQu
     if (sampleRate >= 0 && bufSize >= 0 ) {
         bqPlayerSampleRate = sampleRate * 1000;
         bqPlayerBufSize = bufSize;
+        bqSampleRate = sampleRate;
     }
 
     // configure audio source
@@ -233,8 +258,9 @@ JNIEXPORT void JNICALL Java_com_example_nativemidi_AppMidiManager_createBufferQu
     midiEngine.initialise(sampleRate,bqPlayerBufSize);
     maximumMidiBitsPerBuffer = (double)midiBaudRate/((double)sampleRate/(double)bqPlayerBufSize);
     maximumMidiBytesPerBuffer = (int)(maximumMidiBitsPerBuffer/8.0);
+    nanoSecondsPerBuffer = calculateNanoSecondsPerBuffer();
 
-    byteArray = new uint8_t[3];
+    byteArray = new uint8_t[maxAmidiBufferSize];
 
 
 

@@ -14,7 +14,7 @@ void MidiEngine::initialise(double s, int b) {
     sequencer->initialise(sampleRate, bufferLength);
 }
 
-bool MidiEngine::generateMidi(uint8_t* midiByteArray, int numberOfBytes) {
+int MidiEngine::generateMidi(uint8_t* midiByteArray, int numberOfBytes) {
 
     clearMidiArray(midiByteArray, numberOfBytes);
 
@@ -44,13 +44,13 @@ bool MidiEngine::generateMidi(uint8_t* midiByteArray, int numberOfBytes) {
     std::list<dbMidiMessage> midiMessages;
     sequencer->generateMidi(midiMessages, currentPosition);
 
-    bool messageSent = false;
+    int numberOfBytesSent = 0;
     for (auto message : midiMessages) {
         message.setByteMessage(midiByteArray, 3);
-        messageSent = true;
+        numberOfBytesSent += 3;
     }
 
-    return messageSent;
+    return numberOfBytesSent;
 }
 
 void MidiEngine::shutDown() {

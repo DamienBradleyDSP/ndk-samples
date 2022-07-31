@@ -13,7 +13,7 @@ class MidiEngine {
 public:
     void initialise(double sampleRate, int bufferLength);
 
-    bool generateMidi(uint8_t* , int);
+    int generateMidi(uint8_t* , int);
     void shutDown();
 
 private:
