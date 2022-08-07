@@ -2,6 +2,7 @@
 // Created by Damien on 11/07/2022.
 //
 #include <cstdint>
+#include <stack>
 #include "engine/Sequencer.h"
 #include "parameterLayout.h"
 
@@ -11,21 +12,21 @@
 
 class MidiEngine {
 public:
-    void initialise(double sampleRate, int bufferLength);
+    void initialise(double sampleRate, int bufferLength, int maxBytesPerBuffer);
 
-    int generateMidi(uint8_t* , int);
+    int generateMidi(uint8_t* ,  MidiController::playPositionInformation& currentPosition);
     void shutDown();
 
 private:
-    void clearMidiArray(std::uint8_t* , int);
     void populateParameterMap();
+    void generateClockSignal(uint8_t* , MidiController::playPositionInformation& currentPosition);
+    void generateMtcQuarterFrame(uint8_t* , MidiController::playPositionInformation& currentPosition);
 
     double sampleRate;
     int bufferLength;
-
-    int frameCounter = 0; // testing
-
-    MidiController::playPositionInformation currentPosition;
+    int maxBytesPerBuffer;
+    double midiClock = 0;
+    int maxArrayLocation = 0;
 
     parameterLayout layout;
 

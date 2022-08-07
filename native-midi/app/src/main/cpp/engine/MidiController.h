@@ -36,6 +36,9 @@ public:
         double bpm;
         double ppqPosition;
         double ppqPositionOfLastBarStart;
+        std::int64_t timeInSamples;
+        double 	timeInSeconds;
+        int frameRate; //30fps
     };
 
     // Sequencer Interface

@@ -35,6 +35,7 @@
 
 #include "MidiSpec.h"
 #include "MidiEngine.h"
+#include "engine/MidiController.h"
 #include <jni.h>
 
 // for native audio
@@ -83,6 +84,11 @@ static jlong timeOfMidiStart = 0;
 static jlong nanoSecondsPerBuffer;
 static int maxAmidiBufferSize = 1015;// AMIDI_BUFFER_SIZE - (AMIDI_PACKET_SIZE - AMIDI_PACKET_OVERHEAD)
 
+static MidiController::playPositionInformation currentPosition = {120, 0, 0, 0, 0, 30};
+double frameCounter = 0; // testing
+
+// MIDI CALL BACK AND ASSOCIATED FUNCTIONS ____________________________________________________
+
 static jlong System_nanoTime() {
     timespec now;
 #ifdef CLOCK_MONOTONIC_RAW
@@ -100,10 +106,30 @@ static jlong calculateNanoSecondsPerBuffer()
     return nanoPerBuffer;
 }
 
-//
-// JNI Functions
-//
-extern "C" {
+static void clearMidiArray(std::uint8_t * byteArray, int numberOfBytes) {
+    for(int i =0; i<numberOfBytes; i++) byteArray[i] = 0xFD; //void signal
+}
+
+void updatePlayPosition()
+{
+    // TESTING__________________________________________________________________________________
+    currentPosition.bpm = 120;
+    auto TESTbpm = 120;				// test BPM - STRUCT
+    double beatspersecond = TESTbpm / 60.0;		// 2 beats per second
+    double barspersecond = beatspersecond / 4.0;	// 0.5 bars per second
+    double barspersample = barspersecond / bqSampleRate;		// <<<<1 bars per sample
+    auto samplesperquarternote = bqSampleRate / beatspersecond;	// 24000 samples per quarter note
+    auto quarternotespersample = 1 / samplesperquarternote;	// 1/24000 quarter notes per sample
+    currentPosition.ppqPosition = quarternotespersample * frameCounter;	// calculates current number of quarter notes - this will be done by the struct
+    currentPosition.ppqPositionOfLastBarStart = floor(frameCounter * barspersample) * 4;	// calculates number of quarter notes at start of last bar, 4/4 time
+    frameCounter+=bqPlayerBufSize;
+
+    currentPosition.frameRate = 30;
+    currentPosition.timeInSamples = frameCounter;
+    currentPosition.timeInSeconds = (double)bqSampleRate/frameCounter;
+
+    // TESTING______________________________________________________________________________
+}
 
 void midiEngineCallback(SLAndroidSimpleBufferQueueItf bq, void *context)
 {
@@ -114,12 +140,23 @@ void midiEngineCallback(SLAndroidSimpleBufferQueueItf bq, void *context)
     else timeOfMidiStart += nanoSecondsPerBuffer; // Will this go out of sync?????
     //timeOfMidiStart = System_nanoTime()+nanoSecondsPerBuffer; // potentially just this
 
-    auto numberOfBytesSent = midiEngine.generateMidi(byteArray, maxAmidiBufferSize);
+    updatePlayPosition();
+    clearMidiArray(byteArray, maxAmidiBufferSize);
+
+    assert(maximumMidiBytesPerBuffer < maxAmidiBufferSize); // Midi bytes per buffer should be less than AMIDI's max, in all reasonable cases
+    auto numberOfBytesSent = midiEngine.generateMidi(byteArray, currentPosition);
 
     AMidiInputPort_sendWithTimestamp(sMidiInputPort, byteArray, numberOfBytesSent, timeOfMidiStart); // send without timestamp just calls send with timestamp
 
     (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, nextBuffer, bqPlayerBufSize);
 }
+
+//_________________________________________________________________________________________________
+
+//
+// JNI Functions
+//
+extern "C" {
 
 void Java_com_example_nativemidi_AppMidiManager_startWritingMidi(
         JNIEnv* env, jobject, jobject midiDeviceObj, jint portNumber) {
@@ -255,9 +292,9 @@ JNIEXPORT void JNICALL Java_com_example_nativemidi_AppMidiManager_createBufferQu
     (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, nextBuffer, bqPlayerBufSize);
     (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, nextBuffer, bqPlayerBufSize);
 
-    midiEngine.initialise(sampleRate,bqPlayerBufSize);
     maximumMidiBitsPerBuffer = (double)midiBaudRate/((double)sampleRate/(double)bqPlayerBufSize);
     maximumMidiBytesPerBuffer = (int)(maximumMidiBitsPerBuffer/8.0);
+    midiEngine.initialise(sampleRate,bqPlayerBufSize, maximumMidiBytesPerBuffer-3);
     nanoSecondsPerBuffer = calculateNanoSecondsPerBuffer();
 
     byteArray = new uint8_t[maxAmidiBufferSize];

@@ -10,6 +10,7 @@
 
 #pragma once
 #include <cstdint>
+#include <list>
 
 /*
 namespace midiSpec
@@ -65,7 +66,7 @@ public:
     static dbMidiMessage noteOn(int channel, int noteNumber, float velocity);
     static dbMidiMessage noteOff(int channel, int noteNumber) ;
 
-	void setByteMessage(uint8_t* dataBuffer, int numOfBytes);
+	std::list<uint8_t> get3ByteMessage();
 
 private:
 

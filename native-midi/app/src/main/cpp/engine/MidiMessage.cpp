@@ -59,18 +59,22 @@ dbMidiMessage dbMidiMessage::noteOff(int channel, int noteNumber)
     return message;
 }
 
-void dbMidiMessage::setByteMessage(uint8_t* dataBuffer, int)
-{
+std::list<uint8_t> dbMidiMessage::get3ByteMessage() {
+    std::list<uint8_t> messages;
+
     if (type == messageType::noteOff)
     {
-        dataBuffer[0] = 0x80+midiChannel;
-        dataBuffer[1] = noteNumber;
-        dataBuffer[2] = (uint8_t)(velocity * 127.0f);
+        messages.push_back(0x80+midiChannel);
+        messages.push_back(noteNumber);
+        messages.push_back((uint8_t)(velocity * 127.0f));
     }
     else if (type == messageType::noteOn)
     {
-        dataBuffer[0] = 0x90+midiChannel;
-        dataBuffer[1] = noteNumber;
-        dataBuffer[2] = (uint8_t)(velocity * 127.0f);
+        messages.push_back(0x90+midiChannel);
+        messages.push_back(noteNumber);
+        messages.push_back((uint8_t)(velocity * 127.0f));
     }
+
+    return messages;
 }
+
